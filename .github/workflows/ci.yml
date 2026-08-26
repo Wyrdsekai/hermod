@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege by default: this workflow only reads the checkout. Without an
+# explicit block the token inherits whatever the repository default is, which
+# on a public repo is a needlessly broad grant for a test run.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: ["21", "25"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java-version }}
+      - name: Build & test
+        run: ./gradlew build
+      # `build` already runs it via `check`, but naming it here means a failure
+      # reads as what it is -- hermod-core acquired a dependency -- instead of
+      # as an anonymous failing task.
+      - name: hermod-core has no dependencies
+        run: ./gradlew :hermod-core:checkNoDependencies

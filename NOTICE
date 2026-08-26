@@ -1,0 +1,11 @@
+hermod
+Copyright 2026 The Wyrdsekai Authors
+
+Licensed under the Apache License, Version 2.0.
+
+hermod-core has no dependencies.
+
+hermod-nats and hermod-node include software developed at:
+- jnats (Apache 2.0) — https://github.com/nats-io/nats.java
+- Jackson (Apache 2.0) — https://github.com/FasterXML/jackson
+- SLF4J (MIT License) — https://www.slf4j.org
