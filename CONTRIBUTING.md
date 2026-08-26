@@ -91,5 +91,16 @@ It returns a deployment id. The default is `USER_MANAGED`, so the deployment
 waits in the Portal for you to review and publish it — add
 `&publishingType=AUTOMATIC` only when you want it to go out on validation alone.
 
-Signing uses the gpg agent, so run this from a terminal that can prompt for the
-passphrase.
+Signing uses the gpg agent. If `GPG_TTY` is not set, gpg has nowhere to draw
+its prompt and the build fails with `Inappropriate ioctl for device` — which
+reads like a broken key but is only a missing environment variable:
+
+```bash
+export GPG_TTY=$(tty)
+echo test | gpg --clearsign > /dev/null    # cache the passphrase first
+./gradlew centralBundle
+```
+
+The agent caches for 10 minutes by default. For a longer run, set
+`default-cache-ttl 3600` in `~/.gnupg/gpg-agent.conf` and
+`gpgconf --reload gpg-agent`.
