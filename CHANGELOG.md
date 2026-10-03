@@ -20,6 +20,10 @@ Protocol version 2: a door knows who sent an envelope.
 - `HermodService` advertises its key and both of its doors verify;
   `HermodProbe` advertises an ephemeral key and signs with it.
 
+### Build
+- The Central bundle is staged from an empty directory and refuses to carry
+  any version but the one being released.
+
 ### Compatibility
 - An old advertisement decodes (no key). A 0.1.0 device's envelopes are
   refused by a 0.2.0 door with "advertises no key"; a 0.1.0 door still admits

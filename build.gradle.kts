@@ -83,11 +83,42 @@ subprojects {
     }
 }
 
+// The staging directory is emptied before anything is staged into it, so a bundle
+// carries only the version being released. Central is immutable: a bundle that also
+// carries an already-published version is refused whole. (The first 0.2.0 bundle was
+// built in a tree whose staging directory still held 0.1.0 from August, and had both.)
+val cleanCentralStaging = tasks.register<Delete>("cleanCentralStaging") {
+    group = "publishing"
+    description = "Empty the Central staging directory, so a bundle carries only this version."
+    delete(centralStaging)
+}
+
+subprojects {
+    plugins.withId("maven-publish") {
+        tasks.configureEach {
+            if (name.endsWith("ToCentralStagingRepository")) {
+                dependsOn(cleanCentralStaging)
+            }
+        }
+    }
+}
+
 tasks.register<Zip>("centralBundle") {
     group = "publishing"
     description = "Stage signed artifacts and zip them into a Central Portal bundle."
+    dependsOn(cleanCentralStaging)
     dependsOn(subprojects.mapNotNull { it.tasks.findByName("publishAllPublicationsToCentralStagingRepository") })
     from(centralStaging)
+    // Prove it: a version directory other than this one in the staging tree fails the bundle.
+    doFirst {
+        val here = project.version.toString()
+        val strays = centralStaging.get().asFile.walkTopDown()
+            .filter { it.isDirectory && it.name.matches(Regex("\\d+\\.\\d+\\.\\d+.*")) && it.name != here }
+            .map { it.relativeTo(centralStaging.get().asFile).path }.toList()
+        if (strays.isNotEmpty()) {
+            throw GradleException("staging holds other versions: $strays — the bundle must carry only $here")
+        }
+    }
     // The Portal rejects checksum files it did not ask for, and Gradle's
     // maven-metadata is not part of a release bundle.
     exclude("**/maven-metadata*")

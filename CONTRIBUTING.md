@@ -77,6 +77,11 @@ cd ../hermod-oss
 ./gradlew centralBundle            # signs, stages, zips -> build/central/hermod-<version>.zip
 ```
 
+The bundle carries only the version being released: the staging directory is
+emptied first, and the build fails if another version is found in it. Central
+is immutable, so a bundle that also carries an already-published version is
+refused whole.
+
 Upload the bundle to the Central Publisher Portal. `TOKEN` is the base64 of
 `username:password` from the Portal's token page:
 
