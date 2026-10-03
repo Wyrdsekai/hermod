@@ -83,8 +83,8 @@ Upload the bundle to the Central Publisher Portal. `TOKEN` is the base64 of
 ```bash
 curl -sS --fail-with-body \
   -H "Authorization: Bearer $TOKEN" \
-  -F bundle=@build/central/hermod-0.1.0.zip \
-  "https://central.sonatype.com/api/v1/publisher/upload?name=hermod-0.1.0"
+  -F bundle=@build/central/hermod-0.2.0.zip \
+  "https://central.sonatype.com/api/v1/publisher/upload?name=hermod-0.2.0"
 ```
 
 It returns a deployment id. The default is `USER_MANAGED`, so the deployment

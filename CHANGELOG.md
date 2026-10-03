@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.2.0 (2026-10-03)
+
+Protocol version 2: a door knows who sent an envelope.
+
+### Changed
+- **Envelopes are signed by the sending device.** `EnvelopeSigning` defines
+  the bytes (every stable field, length-prefixed, params in key order) and
+  signs them with the device's Ed25519 key. In 0.1.0 the signature field was
+  carried but never defined or checked.
+- **Advertisements carry the device's public key** (`publicKey`, X.509 SPKI).
+  The table can look a device up by id (`CapabilityTable.find`).
+- **The door verifies the sender before anything else.** `LocalAdmissionGate`
+  built with an origin lookup refuses an unknown device, a device that
+  advertises no key, a bad signature, or an envelope naming another scope.
+  Then expiry, budget and the grant as before.
+- **A grant is checked against the sender:** it must be for the envelope's
+  scope and for the class of the device that sent the task.
+- `HermodService` advertises its key and both of its doors verify;
+  `HermodProbe` advertises an ephemeral key and signs with it.
+
+### Compatibility
+- An old advertisement decodes (no key). A 0.1.0 device's envelopes are
+  refused by a 0.2.0 door with "advertises no key"; a 0.1.0 door still admits
+  a 0.2.0 device's envelopes, since it never looked. Update the devices that
+  send tasks first.
+- The four-argument `LocalAdmissionGate` constructor remains, for tests of the
+  other checks: it does not verify origins (`verifiesOrigin()` is false).
+
 ## 0.1.0 (2026-08-26)
 
 Initial release.

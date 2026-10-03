@@ -1,13 +1,16 @@
 package org.wyrdsekai.hermod;
 
 import java.time.Clock;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * Default door: verifies expiry, budget against a local ceiling, and —
- * for any data-domain task — the presence AND validity of the traveling
- * grant. Grant cryptography is pluggable (the household authority's
- * verifier); refusal reasons are honest and specific.
+ * Default door: verifies who sent the envelope (its signature against the
+ * key in the origin's advertisement), then expiry, budget against a local
+ * ceiling, and — for any data-domain task — the presence AND validity of
+ * the traveling grant, for this household and for the sender's device class.
+ * Grant cryptography is pluggable (the household authority's verifier);
+ * refusal reasons are honest and specific.
  */
 public final class LocalAdmissionGate implements AdmissionGate {
 
@@ -15,9 +18,12 @@ public final class LocalAdmissionGate implements AdmissionGate {
     private final long tokenCeiling;
     private final Predicate<SignedGrant> grantVerifier;
     private final Predicate<TaskEnvelope> busyCheck;
+    /** The live advertisement of the device an envelope says it comes from; null means this gate does not verify origins. */
+    private final Function<String, Capability> originOf;
 
     /**
-     * A gate for this device.
+     * A gate that does not verify who sent the envelope. For tests of the
+     * other checks only: a door on a real device uses the other constructor.
      *
      * @param clock         used to check envelope expiry
      * @param tokenCeiling  the largest token budget this device will accept
@@ -30,14 +36,58 @@ public final class LocalAdmissionGate implements AdmissionGate {
     public LocalAdmissionGate(Clock clock, long tokenCeiling,
                               Predicate<SignedGrant> grantVerifier,
                               Predicate<TaskEnvelope> busyCheck) {
+        this(clock, tokenCeiling, grantVerifier, busyCheck, null);
+    }
+
+    /**
+     * The door as a device builds it: the envelope's origin is looked up in
+     * the device's capability table and the signature verified against that
+     * device's key, before anything else.
+     *
+     * @param clock         used to check envelope expiry
+     * @param tokenCeiling  the largest token budget this device will accept
+     * @param grantVerifier verifies a grant against the authority key
+     * @param busyCheck     true when this device is too busy to take the task
+     * @param originOf      the live advertisement of a device id, or null for
+     *                      a device this table does not know
+     */
+    public LocalAdmissionGate(Clock clock, long tokenCeiling,
+                              Predicate<SignedGrant> grantVerifier,
+                              Predicate<TaskEnvelope> busyCheck,
+                              Function<String, Capability> originOf) {
         this.clock = clock;
         this.tokenCeiling = tokenCeiling;
         this.grantVerifier = grantVerifier;
         this.busyCheck = busyCheck;
+        this.originOf = originOf;
     }
+
+    /**
+     * Whether this gate verifies who sent an envelope.
+     *
+     * @return true for a door built with an origin lookup
+     */
+    public boolean verifiesOrigin() { return originOf != null; }
 
     @Override
     public Decision consider(TaskEnvelope e) {
+        // Who sent it, first. Everything after this trusts the envelope's fields.
+        Capability origin = null;
+        if (originOf != null) {
+            origin = originOf.apply(e.originDeviceId());
+            if (origin == null) {
+                return Decision.refuse("origin '" + e.originDeviceId() + "' is not a device this mesh knows");
+            }
+            if (origin.publicKey() == null || origin.publicKey().length == 0) {
+                return Decision.refuse("origin '" + e.originDeviceId() + "' advertises no key; its envelopes cannot be verified");
+            }
+            if (!EnvelopeSigning.verify(e, origin.publicKey())) {
+                return Decision.refuse("origin signature invalid");
+            }
+            if (origin.householdId() != null && !origin.householdId().equals(e.householdId())) {
+                return Decision.refuse("envelope names scope '" + e.householdId() + "'; origin is of '" + origin.householdId() + "'");
+            }
+        }
         if (e.expiresAt().isBefore(clock.instant())) {
             return Decision.refuse("envelope expired");
         }
@@ -57,6 +107,15 @@ public final class LocalAdmissionGate implements AdmissionGate {
             }
             if (!grantVerifier.test(g)) {
                 return Decision.refuse("grant signature invalid");
+            }
+            // The grant is for this scope and for the class of device that sent the task.
+            if (g.householdId() != null && !g.householdId().equals(e.householdId())) {
+                return Decision.refuse("grant is for scope '" + g.householdId() + "', task is of '" + e.householdId() + "'");
+            }
+            if (origin != null && g.grantedToDeviceClass() != null && !"*".equals(g.grantedToDeviceClass())
+                    && !g.grantedToDeviceClass().equals(origin.capabilityClass())) {
+                return Decision.refuse("grant is for device class '" + g.grantedToDeviceClass()
+                    + "', origin is '" + origin.capabilityClass() + "'");
             }
         }
         if (busyCheck.test(e)) {

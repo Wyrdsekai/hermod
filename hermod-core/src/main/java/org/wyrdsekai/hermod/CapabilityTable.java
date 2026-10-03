@@ -60,6 +60,20 @@ public final class CapabilityTable {
     }
 
     /**
+     * The live advertisement of one device, as a door reads it to verify the
+     * envelopes that device sends.
+     *
+     * @param deviceId the device an envelope says it comes from
+     * @param now      the current time
+     * @return its advertisement, if live
+     */
+    public java.util.Optional<Capability> find(String deviceId, Instant now) {
+        if (deviceId == null) return java.util.Optional.empty();
+        for (var c : snapshot(now)) if (deviceId.equals(c.deviceId())) return java.util.Optional.of(c);
+        return java.util.Optional.empty();
+    }
+
+    /**
      * Subscribe to a transport so every advertisement it receives is merged.
      *
      * @param transport the gossip transport to listen on

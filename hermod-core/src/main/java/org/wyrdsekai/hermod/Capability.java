@@ -24,6 +24,10 @@ import java.util.List;
  * @param loadFactor          current load, 0..1, used as the last tiebreak
  * @param advertisedAt        when this advertisement was made. Entries expire
  *                            by TTL, which is how a device leaves the mesh.
+ * @param publicKey           the device's Ed25519 public key (X.509 SPKI bytes).
+ *                            A door verifies the device's envelopes against it;
+ *                            a device that advertises no key cannot have an
+ *                            envelope admitted by a verifying door.
  */
 public record Capability(
     String deviceId,
@@ -34,5 +38,28 @@ public record Capability(
     boolean charging,
     boolean idle,
     double loadFactor,
-    Instant advertisedAt) {
+    Instant advertisedAt,
+    byte[] publicKey) {
+
+    /**
+     * An advertisement as devices made them before they carried a key (protocol
+     * version 1). Kept so an old advertisement still decodes; such a device's
+     * envelopes are refused by a verifying door, with that reason.
+     *
+     * @param deviceId            stable identifier for the advertising device
+     * @param householdId         the mesh scope this advertisement belongs to
+     * @param capabilityClass     the kind of work this device will take
+     * @param models              model names this device offers, if any
+     * @param residentDataDomains data that lives on this device and must not travel
+     * @param charging            whether the device is on mains power
+     * @param idle                whether the device is otherwise unoccupied
+     * @param loadFactor          current load, 0..1
+     * @param advertisedAt        when this advertisement was made
+     */
+    public Capability(String deviceId, String householdId, String capabilityClass, List<String> models,
+                      List<String> residentDataDomains, boolean charging, boolean idle, double loadFactor,
+                      Instant advertisedAt) {
+        this(deviceId, householdId, capabilityClass, models, residentDataDomains, charging, idle, loadFactor,
+            advertisedAt, null);
+    }
 }

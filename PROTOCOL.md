@@ -1,7 +1,9 @@
 # The hermod protocol
 
-Version 1. The Java classes in `org.wyrdsekai.hermod` are normative; this
-document describes what they do.
+Version 2. The Java classes in `org.wyrdsekai.hermod` are normative; this
+document describes what they do. Version 2 adds the device key to the
+advertisement (§1) and defines the envelope's origin signature, which doors
+now verify first (§4).
 
 ## §0 Invariants
 
@@ -18,6 +20,10 @@ document describes what they do.
 4. **Presence is never routed.** This protocol moves work. Who is
    present, who is speaking, who is bonded — none of that belongs here,
    and transports MUST NOT multiplex it onto these subjects.
+5. **A door knows who knocked.** Every envelope is signed by the device
+   that sent it, with the key that device advertises. A door verifies
+   that before it reads anything else in the envelope; a device that
+   advertises no key cannot have an envelope admitted.
 
 ## §1 Advertisement (gossip)
 
@@ -33,6 +39,10 @@ Each device periodically publishes a `Capability`:
   load). Lying here only hurts the liar: placement prefers idle,
   charging, lightly-loaded devices.
 - `at` — the advertisement instant.
+- `publicKey` — the device's Ed25519 public key, X.509 SPKI bytes
+  (base64 in JSON). What the device's envelopes are verified against
+  (§4). Absent in a version 1 advertisement; such a device's envelopes
+  are refused.
 
 Tables are last-write-wins **per device** with a TTL (reference: 90s).
 A stale ad never regresses a fresher one (pinned by
@@ -77,6 +87,21 @@ consent-bound data), `capabilityClass`, `params` (small string map —
 this is a control plane, not a data plane), `maxTokens`, `issuedAt`,
 `expiresAt`, optional `SignedGrant`, origin signature bytes.
 
+The **origin signature** is the origin device's Ed25519 signature over the
+envelope's stable fields (`EnvelopeSigning.signingBytes`): `envelopeId`,
+`originScope`, `originDevice`, `taskType`, `dataDomain`, `capabilityClass`
+each as `len‖bytes` (UTF-8, a null as empty); then the param count and the
+params as `len‖key len‖value` in key order; then `maxTokens`, `issuedAt`
+and `expiresAt` as 8-byte big-endian (the instants as epoch milliseconds);
+then the grant id (empty when there is no grant) as `len‖bytes`. Lengths
+and the count are 4-byte big-endian. The receiving door looks the origin up in its own
+capability table and verifies the signature against the key in that
+advertisement **before** expiry, budget or grant: an unknown origin, an
+origin with no key, a signature that does not verify, or an envelope whose
+scope differs from the origin's are refused with that reason
+(`AnEnvelopeIsSignedByItsSender`). A grant, when present, must name the
+envelope's scope and the origin's device class.
+
 Reference task type: `inference.chat` with params `model`, `prompt`,
 optional `system` → output is the completion text. Platforms may define
 richer types (wyrdsekai adds `inference.chat.full` carrying a
@@ -98,7 +123,7 @@ windows are the real revocation latency, size them accordingly.
 
 ## §6 Conformance
 
-Run `./gradlew test`. The four core suites and four wire suites are the
+Run `./gradlew test`. The five core suites and five wire suites are the
 compatibility contract. If you write a new transport, make
 `TheAdvertisementSurvivesTheWire` and `AKnockAndItsAnswerSurviveTheWire`
 pass against it before anything else.

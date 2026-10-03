@@ -44,8 +44,10 @@ public final class HermodProbe {
         var gossip = new NatsGossip(nats, scope);
         var table = new CapabilityTable(Duration.ofSeconds(90));
         table.attach(gossip);
+        // The probe is a device like any other: it advertises a key and signs with it.
+        var probeKey = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         gossip.publish(new Capability(deviceId, scope, "probe", List.of(),
-            List.of(), true, true, 0.0, Instant.now()));
+            List.of(), true, true, 0.0, Instant.now(), probeKey.getPublic().getEncoded()));
 
         System.out.println("[probe] listening for gossip on scope " + scope + " ...");
         for (int i = 0; i < 24; i++) {
@@ -59,11 +61,20 @@ public final class HermodProbe {
         var doors = new NatsDoors(nats, scope);
         var mesh = new Mesh(new DefaultRouter(table, Clock.systemUTC()),
             (e, cap) -> doors.doorTo(cap.deviceId()));
-        var envelope = new TaskEnvelope("probe-" + System.nanoTime(), scope, deviceId,
+        var envelope = org.wyrdsekai.hermod.EnvelopeSigning.sign(new TaskEnvelope("probe-" + System.nanoTime(), scope, deviceId,
             "inference.chat", "none", capClass,
             Map.of("model", "default", "prompt", prompt),
             256, Instant.now(), Instant.now().plusSeconds(180),
-            Optional.empty(), new byte[]{1});
+            Optional.empty(), new byte[0]), bytes -> {
+                try {
+                    var s = java.security.Signature.getInstance("Ed25519");
+                    s.initSign(probeKey.getPrivate());
+                    s.update(bytes);
+                    return s.sign();
+                } catch (Exception ex) {
+                    throw new IllegalStateException(ex);
+                }
+            });
 
         System.out.println("[probe] submitting errand for '" + capClass + "' ...");
         var result = mesh.submit(envelope);

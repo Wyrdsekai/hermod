@@ -4,13 +4,13 @@
 // The root carries the version too: without it the bundle filename came out
 // as "hermod-unspecified.zip", since `version` at the root is not the one
 // set on each subproject.
-version = "0.1.0"
+version = "0.2.0"
 
 subprojects {
     apply(plugin = "java-library")
 
     group = "org.wyrdsekai"
-    version = "0.1.0"
+    version = "0.2.0"
 
     repositories { mavenCentral() }
 

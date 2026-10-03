@@ -55,9 +55,9 @@ accepted result. If every candidate declines, it tells you that.
 
 | Step | What happens |
 |---|---|
-| Advertise | Each device publishes a `Capability`: its class, current load, and which data domains it holds. Spread by gossip; there is no registry. |
+| Advertise | Each device publishes a `Capability`: its class, current load, which data domains it holds, and its public key. Spread by gossip; there is no registry. |
 | Route | The sender picks a target from its own local table: capability class first, then data residency, then idle before charging before least-loaded. |
-| Admit | The receiving device decides for itself. It re-checks eligibility, task type, data residency and expiry, and may refuse. A refusal is normal, not an error. |
+| Admit | The receiving device decides for itself. It first verifies the envelope's signature against the sender's advertised key, then re-checks eligibility, task type, data residency and expiry, and may refuse. A refusal is normal, not an error. |
 | Execute | The accepting device runs the task against its own endpoint and returns the result. |
 
 If a target refuses, the sender tries the next candidate. That is how
@@ -99,8 +99,8 @@ would end that quietly.
 
 ```kotlin
 dependencies {
-    implementation("org.wyrdsekai:hermod-core:0.1.0")   // protocol only
-    implementation("org.wyrdsekai:hermod-nats:0.1.0")   // add the transport
+    implementation("org.wyrdsekai:hermod-core:0.2.0")   // protocol only
+    implementation("org.wyrdsekai:hermod-nats:0.2.0")   // add the transport
 }
 ```
 

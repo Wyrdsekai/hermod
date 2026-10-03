@@ -86,7 +86,8 @@ public final class HermodService implements AutoCloseable {
      */
     public Mesh.DoorProtocol ownDoor() {
         var gate = new LocalAdmissionGate(clock, TOKEN_CEILING,
-            GrantAuthority.verifier(authoritySpki), e -> false);
+            GrantAuthority.verifier(authoritySpki), e -> false,
+            id -> table.find(id, Instant.now(clock)).orElse(null));
         return localExecutor == null
             ? Mesh.closed("no local executor configured")
             : Mesh.local(gate, localExecutor);
@@ -164,7 +165,7 @@ public final class HermodService implements AutoCloseable {
                 ? 0.0
                 : Math.min(1.0, loadAvg / Math.max(1, os.getAvailableProcessors()));
             var cap = new Capability(deviceId, scopeId, capabilityClass, models,
-                residentDomains, true, load < 0.5, load, Instant.now(clock));
+                residentDomains, true, load < 0.5, load, Instant.now(clock), authoritySpki);
             transport.publish(cap);
             table.merge(cap); // a device always sees itself
         } catch (Exception e) {
@@ -198,7 +199,8 @@ public final class HermodService implements AutoCloseable {
      */
     public Mesh mesh() {
         var gate = new LocalAdmissionGate(clock, TOKEN_CEILING,
-            GrantAuthority.verifier(authoritySpki), e -> false);
+            GrantAuthority.verifier(authoritySpki), e -> false,
+            id -> table.find(id, Instant.now(clock)).orElse(null));
         return new Mesh(new DefaultRouter(table, clock), (envelope, cap) -> {
             if (cap.deviceId().equals(deviceId)) {
                 if (localExecutor == null) {
